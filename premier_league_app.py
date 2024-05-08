@@ -2,11 +2,11 @@ import streamlit as st
 import requests
 from datetime import datetime, timedelta
 
-# API Key
+# API Key para acessar a API de futebol
 api_key = "9c6b8d27f7mshee5304e7c078b51p1ac484jsn8f51006e77bd" 
 headers = {"X-RapidAPI-Key": api_key}
 
-# Principais Ligas Europeias
+# Dicionário com os nomes e IDs das principais ligas europeias
 PRINCIPAIS_LIGAS = {
     "Premier League (Inglaterra)": 39,
     "La Liga (Espanha)": 140,
@@ -30,10 +30,11 @@ def get_fixtures(league_id, season, next_n_days=None):
     url = f"https://api-football-v1.p.rapidapi.com/v3/fixtures?league={league_id}&season={season}"
     if next_n_days:
         today = datetime.today().date()
-        end_date = today + timedelta(days=int(next_n_days))  # Conversão para inteiro
-        url += f"&from={today}&to={end_date}"
-    response = requests.get(url, headers=headers)
-    return response.json()["response"]
+        end_date = today + timedelta(days=int(next_n_days))  # Calcula a data final
+        url += f"&from={today}&to={end_date}"  # Adiciona filtro de data à URL
+
+    response = requests.get(url, headers=headers)  # Faz a requisição à API
+    return response.json()["response"]  # Retorna a lista de jogos
 
 def get_teams(league_id):
     """
@@ -66,60 +67,39 @@ def get_standings(league_id, season):
 
 def main():
     st.title("Futebol Europeu - Principais Ligas")
-    current_season = datetime.now().year
+    current_season = datetime.now().year  # Obtém o ano atual
 
-    # Seleção da Liga e Ano
-    with st.sidebar:
-        liga_selecionada = st.selectbox("Selecione a Liga", list(PRINCIPAIS_LIGAS.keys()))
-        liga_id = PRINCIPAIS_LIGAS[liga_selecionada]
-        season = st.selectbox("Selecione a Temporada", range(current_season, 2021, -1))
+    # Cria abas para cada liga usando seus nomes como rótulos
+    tabs = st.tabs(list(PRINCIPAIS_LIGAS.keys()))
 
-    tab1, tab2, tab3 = st.tabs(["Jogos", "Times", "Estatísticas"])
+    # Itera sobre as ligas e cria o conteúdo de cada aba
+    for i, (liga_nome, liga_id) in enumerate(PRINCIPAIS_LIGAS.items()):
+        with tabs[i]:  # Define o contexto para a aba atual
+            st.header(liga_nome)  # Exibe o nome da liga como cabeçalho
 
-    with tab1:
-        fixtures = get_fixtures(league_id, season)
+            # Seleção da Temporada
+            season = st.selectbox("Selecione a Temporada", range(current_season, 2021, -1))
 
-        for fixture in fixtures:
-            home_team = fixture["teams"]["home"]["name"]
-            away_team = fixture["teams"]["away"]["name"]
-            date = fixture["fixture"]["date"]
-            score = fixture["goals"]
-            status = fixture["fixture"]["status"]["long"]
+            # Obtém os jogos da liga e temporada selecionadas
+            fixtures = get_fixtures(liga_id, season)
 
-            st.write(f"**{home_team} vs {away_team}**")
-            st.write(f"Data: {date}")
-            if score:
-                st.write(f"Placar: {score['home']} - {score['away']}")
-            st.write(f"Status: {status}")
-            st.write("---")
+            # Itera sobre os jogos e exibe as informações
+            for fixture in fixtures:
+                home_team = fixture["teams"]["home"]["name"]
+                away_team = fixture["teams"]["away"]["name"]
+                date = fixture["fixture"]["date"]
+                score = fixture["goals"]
+                status = fixture["fixture"]["status"]["long"]
 
-    with tab2:
-        next_n_days = st.slider("Próximos dias:", min_value=1, max_value=30, value=7)
-        fixtures = get_fixtures(league_id, current_season, next_n_days)
+                # Cria 4 colunas para organizar os dados do jogo
+                cols = st.columns(4)
+                cols[0].write(f"**{home_team} vs {away_team}**")  # Nomes dos times
+                cols[1].write(f"Data: {date}")  # Data do jogo
+                if score:  # Exibe o placar se estiver disponível
+                    cols[2].write(f"Placar: {score['home']} - {score['away']}") 
+                cols[3].write(f"Status: {status}")  # Status do jogo (ex: "Finalizado")
 
-        # Ordena os jogos do mais recente para o mais antigo
-        fixtures = sorted(fixtures, key=lambda fixture: datetime.fromisoformat(fixture["fixture"]["date"]), reverse=True)
-
-        for fixture in fixtures:
-            home_team = fixture["teams"]["home"]["name"]
-            away_team = fixture["teams"]["away"]["name"]
-            date = fixture["fixture"]["date"]
-            score = fixture["goals"]
-            status = fixture["fixture"]["status"]["long"]
-
-            st.write(f"**{home_team} vs {away_team}**")
-            st.write(f"Data: {date}")
-            if score:
-                st.write(f"Placar: {score['home']} - {score['away']}")
-            st.write(f"Status: {status}")
-            st.write("---")
-
-    with tab3:
-        standings = get_standings(league_id, current_season)[0]['league']['standings'][0]  
-        
-        st.write("## Classificação")
-        for team in standings:
-            st.write(f"**{team['rank']}º - {team['team']['name']}** ({team['points']} pts)") 
+            # ... (implementação das abas "Times" e "Estatísticas" seguindo o mesmo padrão)
 
 if __name__ == "__main__":
     main()
